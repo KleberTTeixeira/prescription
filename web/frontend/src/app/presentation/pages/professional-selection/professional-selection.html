@@ -1,0 +1,27 @@
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <h1 class="h3 mb-1">Prescrição</h1>
+      <p class="text-muted mb-4">Escolha o profissional para continuar.</p>
+
+      @if (loading()) {
+        <p data-testid="loading">Carregando profissionais...</p>
+      } @else if (error()) {
+        <div class="alert alert-danger" role="alert" data-testid="error">{{ error() }}</div>
+      } @else {
+        <div class="list-group">
+          @for (professional of professionals(); track professional.id) {
+            <button type="button" class="list-group-item list-group-item-action" (click)="choose(professional)">
+              <div class="fw-semibold">{{ professional.fullName }}</div>
+              <small class="text-muted">
+                {{ professional.council }} {{ professional.councilNumber }}/{{ professional.councilState }}
+              </small>
+            </button>
+          } @empty {
+            <p class="text-muted">Nenhum profissional cadastrado.</p>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>

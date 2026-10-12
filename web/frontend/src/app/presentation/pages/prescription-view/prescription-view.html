@@ -1,0 +1,92 @@
+@if (error()) {
+  <div class="alert alert-danger" role="alert" data-testid="error">{{ error() }}</div>
+}
+
+@if (prescription(); as p) {
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Receita nº {{ p.id }}</h1>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-primary" [routerLink]="['/receitas', p.id, 'imprimir']" data-testid="print">
+        {{ p.isIssued ? 'Imprimir novamente' : 'Imprimir' }}
+      </a>
+      @if (isOwner() && !p.isIssued) {
+        <a class="btn btn-outline-primary" [routerLink]="['/receitas', p.id, 'editar']" data-testid="edit">Editar</a>
+      }
+      @if (isOwner()) {
+        <button type="button" class="btn btn-outline-danger" data-testid="delete" (click)="remove(p)">Excluir</button>
+      }
+      <a class="btn btn-outline-secondary" routerLink="/receitas">Voltar</a>
+    </div>
+  </div>
+
+  @if (p.isIssued) {
+    <div class="alert alert-info" data-testid="issued">
+      Receita emitida (impressa em {{ p.printedAt | date: 'dd/MM/yyyy HH:mm' }}): só pode ser visualizada,
+      impressa novamente ou excluída.
+    </div>
+  }
+
+  <dl class="row">
+    <dt class="col-sm-3">Data de emissão</dt>
+    <dd class="col-sm-9">{{ p.issuedAt | date: 'dd/MM/yyyy HH:mm' }}</dd>
+    <dt class="col-sm-3">Cliente</dt>
+    <dd class="col-sm-9">{{ p.clientName }}</dd>
+    <dt class="col-sm-3">Profissional</dt>
+    <dd class="col-sm-9">{{ p.professionalName }}</dd>
+    <dt class="col-sm-3">Local de atendimento</dt>
+    <dd class="col-sm-9">{{ p.institutionName }}</dd>
+    <dt class="col-sm-3">Formato</dt>
+    <dd class="col-sm-9">{{ formatLabels[p.format] }}</dd>
+    <dt class="col-sm-3">Categoria</dt>
+    <dd class="col-sm-9">{{ categoryLabels[p.category] }}</dd>
+  </dl>
+
+  @if (p.freeText) {
+    <h2 class="h5">{{ p.format === 'Unstructured' ? 'Texto da receita' : 'Observação geral' }}</h2>
+    <p class="border rounded p-3" style="white-space: pre-wrap" data-testid="free-text">{{ p.freeText }}</p>
+  }
+
+  @if (p.items.length > 0) {
+    <h2 class="h5">Medicamentos</h2>
+    <div class="table-responsive">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Medicamento</th>
+            <th scope="col">Dose</th>
+            <th scope="col">Frequência</th>
+            <th scope="col">Via</th>
+            <th scope="col">Início</th>
+            <th scope="col">Duração</th>
+            <th scope="col">Usar até</th>
+            <th scope="col">Observação</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of p.items; track item.id) {
+            <tr data-testid="item">
+              <td>
+                {{ item.medicationName }}
+                <small class="text-muted d-block">
+                  {{ item.pharmaceuticalFormName }}{{ item.medicationId === null ? ' · não cadastrado' : '' }}
+                </small>
+              </td>
+              <td>{{ item.dose }} {{ item.doseUnitAbbreviation }}</td>
+              <td>{{ item.frequencyName }}</td>
+              <td>{{ item.administrationRouteName }}</td>
+              <td>{{ item.startDate | date: 'dd/MM/yyyy' }}</td>
+              <td>
+                {{ item.durationDays ? item.durationDays + ' dias' : '' }}
+                {{ item.isContinuousUse ? 'Uso contínuo' : '' }}
+              </td>
+              <td>{{ item.usageDeadline | date: 'dd/MM/yyyy' }}</td>
+              <td>{{ item.notes }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+} @else if (!error()) {
+  <p data-testid="loading">Carregando...</p>
+}

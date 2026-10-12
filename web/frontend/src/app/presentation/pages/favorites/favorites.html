@@ -1,0 +1,34 @@
+<h1 class="h3 mb-3">Favoritos</h1>
+
+@if (message()) {
+  <div class="alert alert-success" role="status" data-testid="message">{{ message() }}</div>
+}
+@if (error()) {
+  <div class="alert alert-danger" role="alert" data-testid="error">{{ error() }}</div>
+}
+
+<div class="card card-body mb-4">
+  <h2 class="h5">Adicionar medicamento</h2>
+  <app-medication-search actionText="Favoritar" (selected)="add($event)" />
+</div>
+
+<h2 class="h5">Meus favoritos</h2>
+@if (loading()) {
+  <p data-testid="loading">Carregando favoritos...</p>
+} @else {
+  <ul class="list-group">
+    @for (medication of favorites(); track medication.id) {
+      <li class="list-group-item d-flex justify-content-between align-items-center gap-2" data-testid="favorite">
+        <div>
+          <div class="fw-semibold">{{ medication.displayName }}</div>
+          <small class="text-muted">{{ medication.pharmaceuticalFormName }} · {{ medication.activeIngredient }}</small>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger" data-testid="remove" (click)="remove(medication)">
+          Remover
+        </button>
+      </li>
+    } @empty {
+      <li class="list-group-item text-muted" data-testid="empty">Nenhum medicamento favorito.</li>
+    }
+  </ul>
+}

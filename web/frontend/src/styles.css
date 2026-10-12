@@ -1,0 +1,13 @@
+/* You can add global styles to this file, and also import other style files */
+
+/* Printing (ECF.10.04): only the prescription; menu and buttons are hidden. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-container {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}

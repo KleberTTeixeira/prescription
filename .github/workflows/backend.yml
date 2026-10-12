@@ -1,0 +1,122 @@
+# Backend CI/CD (Web API microservice)
+#   build + unit and integration tests (temporary MySQL 8.0 loaded with the db scripts)
+#   artifacts: test results and the published API
+#   deploy: Docker image pushed to GHCR (only on push to main)
+
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "business/**"
+      - "data/**"
+      - "web/backend/**"
+      - "testes/**"
+      - "db/**"
+      - "Prescription.sln"
+      - ".dockerignore"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "business/**"
+      - "data/**"
+      - "web/backend/**"
+      - "testes/**"
+      - "db/**"
+      - "Prescription.sln"
+      - ".dockerignore"
+      - ".github/workflows/backend.yml"
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    env:
+      PRESCRIPTION_TEST_DB: "server=127.0.0.1;port=3306;database=prescription_db;user=prescription_app;password=prescription_dev_2026"
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same database as docker-compose: MySQL 8.0 created by the scripts in db/.
+      - name: Start MySQL
+        run: |
+          docker run -d --name mysql -p 3306:3306 \
+            -e MYSQL_RANDOM_ROOT_PASSWORD=yes \
+            -e MYSQL_DATABASE=prescription_db \
+            -e MYSQL_USER=prescription_app \
+            -e MYSQL_PASSWORD=prescription_dev_2026 \
+            -v "$GITHUB_WORKSPACE/db/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro" \
+            -v "$GITHUB_WORKSPACE/db/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro" \
+            mysql:8.0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore
+        run: dotnet restore Prescription.sln
+
+      - name: Build
+        run: dotnet build Prescription.sln -c Release --no-restore
+
+      # TCP (127.0.0.1): only answers after the init scripts finish and the final server starts.
+      - name: Wait for MySQL
+        run: |
+          timeout 180 bash -c 'until docker exec mysql mysqladmin ping -h 127.0.0.1 -u prescription_app -pprescription_dev_2026 --silent; do sleep 3; done'
+
+      - name: Test (unit and integration)
+        run: dotnet test Prescription.sln -c Release --no-build --logger trx --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: TestResults
+
+      - name: Publish API
+        run: dotnet publish web/backend/Prescription.Api.csproj -c Release --no-build -o publish
+
+      - name: Upload API
+        uses: actions/upload-artifact@v4
+        with:
+          name: prescription-api
+          path: publish
+
+  deploy:
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # GHCR image names must be lowercase.
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/prescription-api" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: web/backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}

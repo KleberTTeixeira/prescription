@@ -1,0 +1,56 @@
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0">Textos padrão</h1>
+  @if (editingId() === null) {
+    <button type="button" class="btn btn-primary" data-testid="new" (click)="create()">Novo texto padrão</button>
+  }
+</div>
+
+@if (message()) {
+  <div class="alert alert-success" role="status" data-testid="message">{{ message() }}</div>
+}
+@if (error()) {
+  <div class="alert alert-danger" role="alert" data-testid="error">{{ error() }}</div>
+}
+
+@if (editingId() !== null) {
+  <form class="card card-body mb-4" [formGroup]="form" (ngSubmit)="save()" novalidate data-testid="form">
+    <h2 class="h5">{{ editingId() === 0 ? 'Novo texto padrão' : 'Editar texto padrão' }}</h2>
+    <div class="mb-3">
+      <label class="form-label" for="template-title">Título</label>
+      <input id="template-title" class="form-control" formControlName="title" />
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="template-content">Texto</label>
+      <textarea id="template-content" class="form-control" rows="6" formControlName="content"></textarea>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary" [disabled]="saving()" data-testid="save">Salvar</button>
+      <button type="button" class="btn btn-outline-secondary" (click)="cancel()">Cancelar</button>
+    </div>
+  </form>
+}
+
+@if (loading()) {
+  <p data-testid="loading">Carregando textos padrão...</p>
+} @else {
+  <div class="list-group">
+    @for (template of templates(); track template.id) {
+      <div class="list-group-item" data-testid="template">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+          <div class="flex-grow-1">
+            <div class="fw-semibold">{{ template.title }}</div>
+            <div class="text-muted small" style="white-space: pre-wrap">{{ template.content }}</div>
+          </div>
+          <div class="text-nowrap">
+            <button type="button" class="btn btn-sm btn-outline-primary me-1" (click)="edit(template)">Editar</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-testid="delete" (click)="remove(template)">
+              Excluir
+            </button>
+          </div>
+        </div>
+      </div>
+    } @empty {
+      <p class="text-muted" data-testid="empty">Nenhum texto padrão cadastrado.</p>
+    }
+  </div>
+}

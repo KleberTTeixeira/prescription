@@ -1,0 +1,86 @@
+@if (error()) {
+  <div class="alert alert-danger no-print" role="alert" data-testid="error">{{ error() }}</div>
+}
+@if (message()) {
+  <div class="alert alert-success no-print" role="status" data-testid="message">{{ message() }}</div>
+}
+
+@if (data(); as d) {
+  <div class="d-flex flex-wrap gap-2 mb-3 no-print">
+    <button type="button" class="btn btn-primary" data-testid="print" (click)="print()">Imprimir</button>
+    <a class="btn btn-outline-secondary" [routerLink]="['/receitas', d.id]">Voltar</a>
+    @if (d.printedAt) {
+      <span class="align-self-center text-muted" data-testid="issued">
+        Emitida em {{ d.printedAt | date: 'dd/MM/yyyy HH:mm' }}
+      </span>
+    }
+  </div>
+
+  <article class="sheet" data-testid="sheet">
+    <!-- Institution (ECF.10.04: place, CNES, address and phone) -->
+    <header class="text-center border-bottom pb-2 mb-3">
+      <div class="fs-5 fw-semibold">{{ d.institution.name }}</div>
+      <div>CNES {{ d.institution.cnes }}</div>
+      <div>{{ formatAddress(d.institution.address) }}</div>
+      <div>Telefone: {{ d.institution.phone }}</div>
+    </header>
+
+    <h1 class="h4 text-center mb-3">
+      @switch (d.category) {
+        @case ('SpecialControl') { Receituário de controle especial }
+        @case ('Antimicrobial') { Receita de antimicrobiano }
+        @default { Receita }
+      }
+    </h1>
+
+    <!-- Client (address only for special control; age and sex only for antimicrobial) -->
+    <section class="mb-3" data-testid="client">
+      <div><strong>Cliente:</strong> {{ d.client.fullName }}</div>
+      @if (d.client.address) {
+        <div data-testid="client-address"><strong>Endereço:</strong> {{ formatAddress(d.client.address) }}</div>
+      }
+      @if (d.client.age !== null) {
+        <div data-testid="client-age"><strong>Idade:</strong> {{ d.client.age }} anos</div>
+      }
+      @if (d.client.sex) {
+        <div data-testid="client-sex"><strong>Sexo:</strong> {{ sexLabels[d.client.sex] }}</div>
+      }
+    </section>
+
+    @if (d.format === 'Unstructured') {
+      <section class="mb-3 free-text" data-testid="free-text">{{ d.freeText }}</section>
+    } @else {
+      <ol class="mb-3" data-testid="items">
+        @for (item of d.items; track item.id) {
+          <li class="mb-2">
+            <div class="fw-semibold">{{ item.medicationName }} – {{ item.pharmaceuticalFormName }}</div>
+            <div>
+              {{ item.dose }} {{ item.doseUnitAbbreviation }}, {{ item.frequencyName }}, via {{ item.administrationRouteName }}.
+              Início: {{ item.startDate | date: 'dd/MM/yyyy' }}.
+              @if (item.durationDays) { Duração: {{ item.durationDays }} dias. }
+              @if (item.isContinuousUse) { Uso contínuo. }
+              @if (item.usageDeadline) { Usar até {{ item.usageDeadline | date: 'dd/MM/yyyy' }}. }
+            </div>
+            @if (item.notes) {
+              <div class="fst-italic">{{ item.notes }}</div>
+            }
+          </li>
+        }
+      </ol>
+      @if (d.freeText) {
+        <section class="mb-3 free-text"><strong>Observação:</strong> {{ d.freeText }}</section>
+      }
+    }
+
+    <div class="mb-5">{{ d.institution.address.city }}, {{ d.issuedAt | date: 'dd/MM/yyyy HH:mm' }}</div>
+
+    <!-- Professional (council, number, state) and signature space -->
+    <footer class="signature text-center" data-testid="professional">
+      <div class="signature-line"></div>
+      <div class="fw-semibold">{{ d.professional.fullName }}</div>
+      <div>{{ d.professional.council }} {{ d.professional.councilNumber }}/{{ d.professional.councilState }}</div>
+    </footer>
+  </article>
+} @else if (!error()) {
+  <p data-testid="loading">Carregando...</p>
+}

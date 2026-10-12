@@ -1,0 +1,36 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary no-print">
+  <div class="container">
+    <a class="navbar-brand" routerLink="/receitas">Prescrição</a>
+    <button class="navbar-toggler" type="button" aria-controls="main-menu" aria-label="Abrir menu"
+            [attr.aria-expanded]="!menuCollapsed()" (click)="menuCollapsed.set(!menuCollapsed())">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div id="main-menu" class="collapse navbar-collapse" [ngbCollapse]="menuCollapsed()">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/receitas" routerLinkActive="active">Receitas</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/textos-padrao" routerLinkActive="active">Textos padrão</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/favoritos" routerLinkActive="active">Favoritos</a>
+        </li>
+      </ul>
+
+      @if (professional(); as p) {
+        <span class="navbar-text me-3" data-testid="professional">
+          {{ p.fullName }} – {{ p.council }} {{ p.councilNumber }}/{{ p.councilState }}
+        </span>
+      }
+      <button type="button" class="btn btn-outline-light btn-sm" (click)="changeProfessional()">
+        Trocar profissional
+      </button>
+    </div>
+  </div>
+</nav>
+
+<main class="container py-4 print-container">
+  <router-outlet />
+</main>

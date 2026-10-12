@@ -1,0 +1,37 @@
+<form class="input-group" (submit)="$event.preventDefault(); search()">
+  <input type="search" class="form-control" [formControl]="term" placeholder="Nome ou princípio ativo"
+         aria-label="Buscar medicamento por nome ou princípio ativo" data-testid="medication-term" />
+  <button type="submit" class="btn btn-outline-primary" [disabled]="searching()">Buscar</button>
+</form>
+
+@if (error()) {
+  <div class="alert alert-danger mt-2 mb-0" role="alert" data-testid="search-error">{{ error() }}</div>
+} @else if (searched()) {
+  @if (results().length === 0) {
+    <p class="text-muted mt-2 mb-0" data-testid="no-results">Nenhum medicamento encontrado.</p>
+  } @else {
+    <ul class="medication-list mt-2" role="listbox" aria-label="Medicamentos encontrados">
+      @for (medication of results(); track medication.id) {
+        <li class="medication-row" role="option" tabindex="0" [class.chosen]="chosenId() === medication.id"
+            [attr.aria-selected]="chosenId() === medication.id"
+            (click)="choose(medication)" (keydown.enter)="choose(medication)">
+          <div class="flex-grow-1">
+            <div class="fw-semibold">{{ medication.displayName }}</div>
+            <small class="text-muted">
+              {{ medication.pharmaceuticalFormName }} · {{ medication.activeIngredient }}
+            </small>
+          </div>
+          <div class="text-end">
+            @if (medication.isControlled) {
+              <span class="badge text-bg-danger me-1">Controlado</span>
+            }
+            @if (medication.isAntimicrobial) {
+              <span class="badge text-bg-warning me-1">Antimicrobiano</span>
+            }
+            <span class="btn btn-sm btn-primary">{{ actionText() }}</span>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+}

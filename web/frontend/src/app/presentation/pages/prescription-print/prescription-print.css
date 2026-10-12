@@ -1,0 +1,29 @@
+.sheet {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 2rem;
+  border: 1px solid var(--bs-border-color);
+  background-color: #fff;
+}
+
+.free-text {
+  white-space: pre-wrap;
+}
+
+.signature {
+  margin-top: 4rem;
+}
+
+.signature-line {
+  width: 60%;
+  margin: 0 auto 0.25rem;
+  border-top: 1px solid #000;
+}
+
+@media print {
+  .sheet {
+    max-width: none;
+    border: none;
+    padding: 0;
+  }
+}

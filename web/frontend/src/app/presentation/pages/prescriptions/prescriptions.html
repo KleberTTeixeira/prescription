@@ -1,0 +1,78 @@
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0">Receitas</h1>
+  <a class="btn btn-primary" routerLink="/receitas/nova" data-testid="new">Nova receita</a>
+</div>
+
+<form class="input-group mb-3" (submit)="$event.preventDefault(); search()">
+  <input type="search" class="form-control" [formControl]="clientName" placeholder="Nome do cliente"
+         aria-label="Filtrar pelo nome do cliente" />
+  <button type="submit" class="btn btn-outline-primary">Filtrar</button>
+</form>
+
+@if (message()) {
+  <div class="alert alert-success" role="status" data-testid="message">{{ message() }}</div>
+}
+
+@if (error()) {
+  <div class="alert alert-danger" role="alert" data-testid="error">{{ error() }}</div>
+}
+
+@if (loading()) {
+  <p data-testid="loading">Carregando receitas...</p>
+} @else if (rows().length === 0) {
+  <p class="text-muted" data-testid="empty">Nenhuma receita encontrada.</p>
+} @else {
+  <div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+      <thead>
+        <tr>
+          @for (column of columns; track column.field) {
+            <th scope="col" [attr.aria-sort]="ariaSort(column.field)">
+              <button type="button" class="btn btn-link p-0 fw-bold text-reset text-decoration-none text-nowrap"
+                      [attr.data-testid]="'sort-' + column.field" title="Ordenar por {{ column.title }}"
+                      (click)="sortBy(column.field)">
+                {{ column.title }} {{ sortIndicator(column.field) }}
+              </button>
+            </th>
+          }
+          <th scope="col" class="text-end">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.id) {
+          <tr data-testid="row">
+            <td>{{ row.id }}</td>
+            <td>{{ row.issuedAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+            <td>{{ row.clientName }}</td>
+            <td>{{ formatLabels[row.format] }}</td>
+            <td>{{ categoryLabels[row.category] }}</td>
+            <td>{{ row.itemCount }}</td>
+            <td>
+              @if (row.isIssued) {
+                <span class="badge text-bg-success">Emitida</span>
+              } @else {
+                <span class="badge text-bg-secondary">Não emitida</span>
+              }
+            </td>
+            <td class="text-end text-nowrap">
+              <a class="btn btn-sm btn-outline-primary me-1" [routerLink]="['/receitas', row.id]">Visualizar</a>
+              @if (!row.isIssued) {
+                <a class="btn btn-sm btn-outline-primary me-1" [routerLink]="['/receitas', row.id, 'editar']"
+                   data-testid="edit">Editar</a>
+              }
+              <a class="btn btn-sm btn-outline-secondary me-1" [routerLink]="['/receitas', row.id, 'imprimir']">Imprimir</a>
+              <button type="button" class="btn btn-sm btn-outline-danger" data-testid="delete" (click)="remove(row)">
+                Excluir
+              </button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (total() > pageSize) {
+    <ngb-pagination [collectionSize]="total()" [pageSize]="pageSize" [page]="page()" [maxSize]="5"
+                    (pageChange)="changePage($event)" aria-label="Páginas das receitas" />
+  }
+}

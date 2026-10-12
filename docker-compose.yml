@@ -1,0 +1,55 @@
+# MySQL 8.0, Web API and Angular - run from the root of the solution folder:
+#   docker compose up -d --build
+# Angular: http://localhost:4200 | Web API (Swagger): http://localhost:5000/swagger | MySQL: localhost:3306
+# Database data is kept in the "mysql-data" volume; the db scripts run only on the first start.
+# Back to the original seed: docker compose down -v
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: prescription_db
+      MYSQL_USER: prescription_app
+      MYSQL_PASSWORD: prescription_dev_2026
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./db/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      # TCP (127.0.0.1): only answers after the init scripts finish and the final server starts.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u $$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: web/backend/Dockerfile
+    image: prescription-api
+    environment:
+      ConnectionStrings__PrescriptionDb: "server=mysql;port=3306;database=prescription_db;user=prescription_app;password=prescription_dev_2026"
+    ports:
+      - "5000:5000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: web/frontend/Dockerfile
+    image: prescription-web
+    environment:
+      API_URL: http://api:5000
+    ports:
+      - "4200:4200"
+    depends_on:
+      - api
+
+volumes:
+  mysql-data:

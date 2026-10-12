@@ -1,0 +1,229 @@
+<h1 class="h3 mb-3">{{ id() === null ? 'Nova receita' : 'Editar receita nº ' + id() }}</h1>
+
+@if (loadError()) {
+  <div class="alert alert-danger" role="alert" data-testid="load-error">{{ loadError() }}</div>
+  <a class="btn btn-outline-secondary" routerLink="/receitas">Voltar</a>
+} @else if (blocked()) {
+  <div class="alert alert-warning" role="alert" data-testid="blocked">{{ blocked() }}</div>
+  <a class="btn btn-outline-secondary" [routerLink]="['/receitas', id()]">Visualizar receita</a>
+} @else if (lists(); as lists) {
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <!-- version(): read so the view refreshes after changes made outside template events -->
+    <span hidden>{{ version() }}</span>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label" for="client">Cliente</label>
+        <select id="client" class="form-select" formControlName="clientId">
+          <option [ngValue]="null">Selecione...</option>
+          @for (client of lists.clients; track client.id) {
+            <option [ngValue]="client.id">{{ client.fullName }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="institution">Local de atendimento</label>
+        <select id="institution" class="form-select" formControlName="institutionId">
+          <option [ngValue]="null">Selecione...</option>
+          @for (institution of lists.institutions; track institution.id) {
+            <option [ngValue]="institution.id">{{ institution.name }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="col-md-6">
+        <span class="form-label d-block">Formato</span>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" id="format-structured" value="Structured"
+                 formControlName="format" (change)="changeFormat()" />
+          <label class="form-check-label" for="format-structured">Estruturada (itens)</label>
+        </div>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" id="format-unstructured" value="Unstructured"
+                 formControlName="format" (change)="changeFormat()" />
+          <label class="form-check-label" for="format-unstructured">Não estruturada (texto livre)</label>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="category">Categoria</label>
+        <select id="category" class="form-select" formControlName="category">
+          @for (category of categories; track category) {
+            <option [ngValue]="category">{{ categoryLabels[category] }}</option>
+          }
+        </select>
+        @if (suggestedCategory(); as suggested) {
+          <div class="form-text" data-testid="suggested-category">
+            Sugerida pelo sistema: {{ categoryLabels[suggested] }}
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- ECF.10.01 / ECF.10.02 -->
+    <div class="mb-3">
+      <label class="form-label" for="free-text">
+        {{ form.controls.format.value === 'Unstructured' ? 'Texto da receita' : 'Observação geral (opcional)' }}
+      </label>
+      @if (templates().length > 0) {
+        <div class="input-group mb-2">
+          <select class="form-select" [formControl]="templateId" aria-label="Texto padrão">
+            <option [ngValue]="null">Texto padrão...</option>
+            @for (template of templates(); track template.id) {
+              <option [ngValue]="template.id">{{ template.title }}</option>
+            }
+          </select>
+          <button type="button" class="btn btn-outline-primary" data-testid="use-template" (click)="useTemplate()">
+            Usar texto padrão
+          </button>
+        </div>
+      }
+      <textarea id="free-text" class="form-control" rows="5" formControlName="freeText"></textarea>
+    </div>
+
+    <!-- ECF.10.03 -->
+    @if (form.controls.format.value === 'Structured') {
+      <h2 class="h5">Medicamentos</h2>
+      <div formArrayName="items">
+        @for (item of items.controls; track item; let i = $index) {
+          <div class="card mb-3" [formGroupName]="i" data-testid="item">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span class="fw-semibold">Item {{ i + 1 }}</span>
+              <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeItem(i)">Remover item</button>
+            </div>
+            <div class="card-body">
+              @if (item.controls.medicationId.value !== null) {
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                  <span class="fw-semibold" data-testid="medication-name">{{ item.controls.medicationName.value }}</span>
+                  <span class="text-muted">{{ formName(item.controls.pharmaceuticalFormId.value) }}</span>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="changeMedication(i)">
+                    Trocar medicamento
+                  </button>
+                </div>
+              } @else if (item.controls.notRegistered.value) {
+                <div class="row g-2 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label" [for]="'item-' + i + '-name'">Medicamento não cadastrado</label>
+                    <input class="form-control" [id]="'item-' + i + '-name'" formControlName="medicationName" />
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label" [for]="'item-' + i + '-form'">Forma farmacêutica</label>
+                    <select class="form-select" [id]="'item-' + i + '-form'" formControlName="pharmaceuticalFormId">
+                      <option [ngValue]="null">Selecione...</option>
+                      @for (form of lists.pharmaceuticalForms; track form.id) {
+                        <option [ngValue]="form.id">{{ form.name }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="col-md-2 d-flex align-items-end">
+                    <button type="button" class="btn btn-outline-secondary w-100" (click)="changeMedication(i)">
+                      Buscar no cadastro
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                <div class="mb-3">
+                  <app-medication-search (selected)="chooseMedication(i, $event)" />
+                  <div class="d-flex flex-wrap gap-2 mt-2">
+                    @if (favorites().length > 0) {
+                      <select class="form-select w-auto" aria-label="Escolher dos favoritos"
+                              (change)="chooseFavorite(i, $any($event.target).value)">
+                        <option value="">Favoritos...</option>
+                        @for (favorite of favorites(); track favorite.id) {
+                          <option [value]="favorite.id">{{ favorite.displayName }}</option>
+                        }
+                      </select>
+                    }
+                    <button type="button" class="btn btn-outline-secondary" data-testid="not-registered"
+                            (click)="markNotRegistered(i)">
+                      Medicamento não cadastrado
+                    </button>
+                  </div>
+                </div>
+              }
+
+              <div class="row g-2">
+                <div class="col-6 col-md-2">
+                  <label class="form-label" [for]="'item-' + i + '-dose'">Dose</label>
+                  <input type="number" min="0" step="any" class="form-control" [id]="'item-' + i + '-dose'"
+                         formControlName="dose" />
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label" [for]="'item-' + i + '-unit'">Unidade</label>
+                  <select class="form-select" [id]="'item-' + i + '-unit'" formControlName="doseUnitId">
+                    <option [ngValue]="null">...</option>
+                    @for (unit of lists.doseUnits; track unit.id) {
+                      <option [ngValue]="unit.id">{{ unit.abbreviation }} – {{ unit.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" [for]="'item-' + i + '-frequency'">Frequência</label>
+                  <select class="form-select" [id]="'item-' + i + '-frequency'" formControlName="frequencyId">
+                    <option [ngValue]="null">Selecione...</option>
+                    @for (frequency of lists.frequencies; track frequency.id) {
+                      <option [ngValue]="frequency.id">{{ frequency.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" [for]="'item-' + i + '-route'">Via de administração</label>
+                  <select class="form-select" [id]="'item-' + i + '-route'" formControlName="administrationRouteId">
+                    <option [ngValue]="null">Selecione...</option>
+                    @for (route of lists.administrationRoutes; track route.id) {
+                      <option [ngValue]="route.id">{{ route.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label" [for]="'item-' + i + '-start'">Início</label>
+                  <input type="date" class="form-control" [id]="'item-' + i + '-start'" formControlName="startDate" />
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label" [for]="'item-' + i + '-duration'">Duração (dias)</label>
+                  <input type="number" min="1" step="1" class="form-control" [id]="'item-' + i + '-duration'"
+                         formControlName="durationDays" />
+                </div>
+                <div class="col-6 col-md-2 d-flex align-items-end">
+                  <div class="form-check mb-2">
+                    <input type="checkbox" class="form-check-input" [id]="'item-' + i + '-continuous'"
+                           formControlName="isContinuousUse" />
+                    <label class="form-check-label" [for]="'item-' + i + '-continuous'">Uso contínuo</label>
+                  </div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label" [for]="'item-' + i + '-deadline'">Usar até (prazo)</label>
+                  <input type="date" class="form-control" [id]="'item-' + i + '-deadline'"
+                         formControlName="usageDeadline" data-testid="usage-deadline" />
+                </div>
+                <div class="col-12">
+                  <label class="form-label" [for]="'item-' + i + '-notes'">Observação</label>
+                  <input class="form-control" [id]="'item-' + i + '-notes'" formControlName="notes" />
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+      <button type="button" class="btn btn-outline-primary mb-3" data-testid="add-item" (click)="addItem()">
+        Adicionar medicamento
+      </button>
+    }
+
+    @if (errors().length > 0) {
+      <div class="alert alert-danger" role="alert" data-testid="errors">
+        <ul class="mb-0">
+          @for (error of errors(); track $index) {
+            <li>{{ error }}</li>
+          }
+        </ul>
+      </div>
+    }
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary" [disabled]="saving()" data-testid="save">Salvar</button>
+      <a class="btn btn-outline-secondary" [routerLink]="id() === null ? ['/receitas'] : ['/receitas', id()]">Cancelar</a>
+    </div>
+  </form>
+} @else {
+  <p data-testid="loading">Carregando...</p>
+}
