@@ -1,0 +1,72 @@
+@inject TemplateApiClient TemplateApi
+
+@* ECF.10.02 – create / edit a standard text in a dialog; closes with the saved text. *@
+<MudDialog data-testid="template-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(Template is null ? "Novo texto padrão" : "Editar texto padrão")</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" data-testid="error">@_error</MudAlert>
+        }
+        <MudTextField T="string" Label="Título" @bind-Value="_title" Variant="Variant.Outlined" Class="mb-3"
+                      Error="_titleError is not null" ErrorText="@_titleError" data-testid="title" />
+        <MudTextField T="string" Label="Texto" @bind-Value="_content" Lines="6" Variant="Variant.Outlined"
+                      Error="_contentError is not null" ErrorText="@_contentError" data-testid="content" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" data-testid="cancel">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_saving" OnClick="SaveAsync"
+                   data-testid="save">Salvar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    /// <summary>Text being edited; null = new.</summary>
+    [Parameter]
+    public Template? Template { get; set; }
+
+    private string? _title;
+    private string? _content;
+    private string? _titleError;
+    private string? _contentError;
+    private string? _error;
+    private bool _saving;
+
+    protected override void OnInitialized() => (_title, _content) = (Template?.Title, Template?.Content);
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SaveAsync()
+    {
+        _titleError = string.IsNullOrWhiteSpace(_title) ? "Campo 'Título' é obrigatório." : null;
+        _contentError = string.IsNullOrWhiteSpace(_content) ? "Campo 'Texto' é obrigatório." : null;
+        if (_titleError is not null || _contentError is not null)
+        {
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var request = new TemplateRequest(_title!.Trim(), _content!);
+            var saved = Template is null
+                ? await TemplateApi.CreateAsync(request)
+                : await TemplateApi.UpdateAsync(Template.Id, request);
+            Dialog.Close(DialogResult.Ok(saved));
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

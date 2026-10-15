@@ -1,0 +1,95 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ILoggedProfessionalStore LoggedProfessional
+@inject NavigationManager Navigation
+
+@* Top bar, side menu and the chosen professional; pages open in the main area. *@
+<MudProviders />
+
+<MudLayout>
+    <MudAppBar Elevation="2" Class="no-print">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="() => _drawerOpen = !_drawerOpen" aria-label="Abrir ou fechar o menu" />
+        <MudText Typo="Typo.h6" Class="ml-3">Prescrição</MudText>
+        <MudSpacer />
+        @if (LoggedProfessional.Current is { } professional)
+        {
+            <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" data-testid="professional-menu">
+                <ActivatorContent>
+                    @* MudBlazor 9: custom activator content opens the menu through the MenuContext. *@
+                    <MudButton Variant="Variant.Text" Color="Color.Inherit" Style="text-transform: none"
+                               EndIcon="@Icons.Material.Filled.ArrowDropDown" OnClick="@context.ToggleAsync"
+                               data-testid="professional">
+                        <MudAvatar Size="Size.Medium" Class="mr-2" Style="background-color: #e3f2fd; color: #1565c0">@professional.Initials</MudAvatar>
+                        <span class="d-none d-sm-flex flex-column align-start" style="line-height: 1.2">
+                            <span>@professional.FullName</span>
+                            <small style="opacity: .8">@professional.CouncilRegistration</small>
+                        </span>
+                    </MudButton>
+                </ActivatorContent>
+                <ChildContent>
+                    <MudMenuItem Icon="@Icons.Material.Filled.SwapHoriz" OnClick="ChangeProfessionalAsync"
+                                 data-testid="change-professional">Trocar profissional</MudMenuItem>
+                </ChildContent>
+            </MudMenu>
+        }
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="0" Variant="DrawerVariant.Responsive" ClipMode="DrawerClipMode.Always"
+               Class="no-print">
+        <MudNavMenu Color="Color.Primary" Class="mt-2">
+            <MudNavLink Href="receitas" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Description">Receitas</MudNavLink>
+            <MudNavLink Href="textos-padrao" Icon="@Icons.Material.Filled.Notes">Textos padrão</MudNavLink>
+            <MudNavLink Href="favoritos" Icon="@Icons.Material.Filled.Star">Favoritos</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-6 print-container">
+            @if (LoggedProfessional.Current is not null)
+            {
+                @Body
+            }
+            else
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Ocorreu um erro inesperado.
+    <a href="." class="reload">Recarregar</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private bool _drawerOpen = true;
+
+    protected override void OnInitialized() => LoggedProfessional.Changed += OnProfessionalChanged;
+
+    // Browser storage is only reachable after the first render.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+        await LoggedProfessional.LoadAsync();
+        if (LoggedProfessional.Current is null)
+        {
+            Navigation.NavigateTo("profissional", replace: true);
+        }
+    }
+
+    private async Task ChangeProfessionalAsync()
+    {
+        await LoggedProfessional.ClearAsync();
+        Navigation.NavigateTo("profissional");
+    }
+
+    private void OnProfessionalChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => LoggedProfessional.Changed -= OnProfessionalChanged;
+}

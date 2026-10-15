@@ -1,0 +1,90 @@
+@page "/profissional"
+@layout EmptyLayout
+@inject CatalogApiClient Catalog
+@inject ILoggedProfessionalStore LoggedProfessional
+@inject NavigationManager Navigation
+
+@* Initial screen: the user chooses the professional (in place of a login). *@
+<PageTitle>Escolha do profissional</PageTitle>
+
+<div class="selection-background">
+    <MudPaper Elevation="4" Class="pa-8 selection-card">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.MedicalServices" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h4">Prescrição</MudText>
+        </MudStack>
+        <MudText Class="mb-6 mt-1" Color="Color.Secondary">Escolha o profissional para continuar</MudText>
+
+        @if (_loading)
+        {
+            <MudGrid Spacing="3">
+                @for (var i = 0; i < 4; i++)
+                {
+                    <MudItem xs="12" sm="6"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" /></MudItem>
+                }
+            </MudGrid>
+            <span class="d-none" data-testid="loading">Carregando profissionais...</span>
+        }
+        else if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" data-testid="error">@_error</MudAlert>
+        }
+        else if (_professionals.Count == 0)
+        {
+            <MudText data-testid="empty">Nenhum profissional cadastrado.</MudText>
+        }
+        else
+        {
+            <MudGrid Spacing="3" data-testid="professionals">
+                @foreach (var professional in _professionals)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudCard Outlined="true" Class="professional-card" @onclick="() => ChooseAsync(professional)"
+                                 data-testid="professional">
+                            <MudCardHeader>
+                                <CardHeaderAvatar>
+                                    <MudAvatar Color="Color.Primary" Size="Size.Large">@professional.Initials</MudAvatar>
+                                </CardHeaderAvatar>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.subtitle1"><b>@professional.FullName</b></MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@professional.CouncilRegistration</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Primary" Class="mt-3 mr-2" />
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </MudPaper>
+</div>
+
+@code {
+    private IReadOnlyList<Professional> _professionals = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _professionals = await Catalog.GetProfessionalsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ChooseAsync(Professional professional)
+    {
+        await LoggedProfessional.SetAsync(professional);
+        Navigation.NavigateTo("receitas");
+    }
+}

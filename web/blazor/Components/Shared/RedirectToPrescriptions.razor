@@ -1,0 +1,6 @@
+@inject NavigationManager Navigation
+
+@* "/" and unknown routes open the prescription list. *@
+@code {
+    protected override void OnInitialized() => Navigation.NavigateTo("receitas", replace: true);
+}

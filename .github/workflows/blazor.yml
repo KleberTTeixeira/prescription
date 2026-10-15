@@ -1,0 +1,95 @@
+# Blazor CI/CD (Prescription.Blazor)
+#   build + component tests (bUnit)
+#   artifacts: test results and the published application
+#   deploy: Docker image pushed to GHCR (only on push to main)
+
+name: blazor
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/blazor/**"
+      - "testes/blazor/**"
+      - ".dockerignore"
+      - ".github/workflows/blazor.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/blazor/**"
+      - "testes/blazor/**"
+      - ".dockerignore"
+      - ".github/workflows/blazor.yml"
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore testes/blazor/Prescription.Blazor.Tests.csproj
+
+      - name: Build
+        run: dotnet build testes/blazor/Prescription.Blazor.Tests.csproj -c Release --no-restore
+
+      - name: Test
+        run: dotnet test testes/blazor/Prescription.Blazor.Tests.csproj -c Release --no-build --logger trx --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blazor-test-results
+          path: TestResults
+
+      - name: Publish Blazor
+        run: dotnet publish web/blazor/Prescription.Blazor.csproj -c Release --no-build -o publish
+
+      - name: Upload Blazor
+        uses: actions/upload-artifact@v4
+        with:
+          name: prescription-blazor
+          path: publish
+
+  deploy:
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # GHCR image names must be lowercase.
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/prescription-blazor" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: web/blazor/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}

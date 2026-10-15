@@ -1,0 +1,14 @@
+@* Category of the prescription as a colored tag. *@
+<MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="ColorOf(Category)" data-testid="category">@Category.ToLabel()</MudChip>
+
+@code {
+    [Parameter, EditorRequired]
+    public PrescriptionCategory Category { get; set; }
+
+    private static Color ColorOf(PrescriptionCategory category) => category switch
+    {
+        PrescriptionCategory.Antimicrobial => Color.Warning,
+        PrescriptionCategory.SpecialControl => Color.Error,
+        _ => Color.Primary
+    };
+}

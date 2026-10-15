@@ -1,0 +1,167 @@
+@page "/receitas/{Id:int}"
+@inject PrescriptionApiClient PrescriptionApi
+@inject ILoggedProfessionalStore LoggedProfessional
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+@* Prescription details (any professional can view and reprint; only the owner edits and deletes). *@
+<PageTitle>Receita</PageTitle>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-3" data-testid="error">@_error</MudAlert>
+}
+
+@if (_prescription is { } p)
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudIconButton Href="receitas" Icon="@Icons.Material.Filled.ArrowBack" aria-label="Voltar" />
+        <MudText Typo="Typo.h5" data-testid="title">Receita nº @p.Id</MudText>
+        <CategoryChip Category="p.Category" />
+        <SituationChip IsIssued="p.IsIssued" />
+        <MudSpacer />
+        <MudButton Href="@($"receitas/{p.Id}/imprimir")" Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Print" data-testid="print">@(p.IsIssued ? "Imprimir novamente" : "Imprimir")</MudButton>
+        @if (IsOwner && !p.IsIssued)
+        {
+            <MudButton Href="@($"receitas/{p.Id}/editar")" Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit" data-testid="edit">Editar</MudButton>
+        }
+        @if (IsOwner)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="DeleteAsync" data-testid="delete">Excluir</MudButton>
+        }
+    </MudStack>
+
+    @if (p.IsIssued)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4" data-testid="issued">
+            Receita emitida (impressa em @p.PrintedAt?.ToString("dd/MM/yyyy HH:mm")): só pode ser visualizada,
+            impressa novamente ou excluída.
+        </MudAlert>
+    }
+
+    <MudPaper Elevation="1" Class="pa-5 mb-4" data-testid="details">
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6" md="4"><Field Label="Data de emissão" Value="@p.IssuedAt.ToString("dd/MM/yyyy HH:mm")" /></MudItem>
+            <MudItem xs="12" sm="6" md="4"><Field Label="Cliente" Value="@p.ClientName" /></MudItem>
+            <MudItem xs="12" sm="6" md="4"><Field Label="Profissional" Value="@p.ProfessionalName" /></MudItem>
+            <MudItem xs="12" sm="6" md="4"><Field Label="Local de atendimento" Value="@p.InstitutionName" /></MudItem>
+            <MudItem xs="12" sm="6" md="4"><Field Label="Formato" Value="@p.Format.ToLabel()" /></MudItem>
+            <MudItem xs="12" sm="6" md="4"><Field Label="Categoria" Value="@p.Category.ToLabel()" /></MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (!string.IsNullOrEmpty(p.FreeText))
+    {
+        <MudPaper Elevation="1" Class="pa-5 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-2">@(p.Format == PrescriptionFormat.Unstructured ? "Texto da receita" : "Observação geral")</MudText>
+            <MudText Style="white-space: pre-wrap" data-testid="free-text">@p.FreeText</MudText>
+        </MudPaper>
+    }
+
+    @if (p.Items.Count > 0)
+    {
+        <MudPaper Elevation="1" Class="mb-4">
+            <MudText Typo="Typo.h6" Class="pa-5 pb-2">Medicamentos</MudText>
+            <MudSimpleTable Striped="true" Elevation="0">
+                <thead>
+                    <tr>
+                        <th>Medicamento</th>
+                        <th>Dose</th>
+                        <th>Frequência</th>
+                        <th>Via</th>
+                        <th>Início</th>
+                        <th>Duração</th>
+                        <th>Usar até</th>
+                        <th>Observação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in p.Items)
+                    {
+                        <tr data-testid="item">
+                            <td>
+                                <b>@item.MedicationName</b>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block">
+                                    @item.PharmaceuticalFormName@(item.MedicationId is null ? " · não cadastrado" : "")
+                                </MudText>
+                            </td>
+                            <td>@AppCulture.Number(item.Dose) @item.DoseUnitAbbreviation</td>
+                            <td>@item.FrequencyName</td>
+                            <td>@item.AdministrationRouteName</td>
+                            <td>@item.StartDate.ToString("dd/MM/yyyy")</td>
+                            <td>
+                                @(item.DurationDays is { } days ? $"{days} dias" : "")
+                                @(item.IsContinuousUse ? "Uso contínuo" : "")
+                            </td>
+                            <td>@item.UsageDeadline?.ToString("dd/MM/yyyy")</td>
+                            <td>@item.Notes</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+}
+else if (_error is null)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="300px" />
+    <span class="d-none" data-testid="loading">Carregando...</span>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private MedicalPrescription? _prescription;
+    private string? _error;
+
+    private bool IsOwner => _prescription?.ProfessionalId == LoggedProfessional.Current?.Id;
+
+    private int? _loadedId;
+
+    // Going from one prescription to another keeps this component: load again when Id changes.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Id)
+        {
+            return;
+        }
+        _loadedId = Id;
+        _prescription = null;
+        _error = null;
+        try
+        {
+            _prescription = await PrescriptionApi.GetAsync((uint)Id);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        var prescription = _prescription!;
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Excluir receita", $"Excluir a receita nº {prescription.Id} de {prescription.ClientName}?",
+            yesText: "Excluir", cancelText: "Cancelar");
+        if (confirmed != true)
+        {
+            return;
+        }
+        try
+        {
+            await PrescriptionApi.DeleteAsync(prescription.Id);
+            Snackbar.Add($"Receita nº {prescription.Id} excluída.", Severity.Success);
+            Navigation.NavigateTo("receitas");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

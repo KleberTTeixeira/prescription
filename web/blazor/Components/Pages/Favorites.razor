@@ -1,0 +1,123 @@
+@page "/favoritos"
+@inject FavoriteApiClient FavoriteApi
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@* ECF.10.10 – favorite medications of the logged professional (used in the prescription). *@
+<PageTitle>Favoritos</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">Favoritos</MudText>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-3" data-testid="error">@_error</MudAlert>
+}
+
+<MudPaper Elevation="1" Class="pa-5 mb-6">
+    <MedicationSearch Label="Adicionar medicamento aos favoritos" ClearAfterChoosing="true" OnSelected="AddAsync" />
+</MudPaper>
+
+@if (_loading)
+{
+    <MudGrid Spacing="3">
+        @for (var i = 0; i < 3; i++)
+        {
+            <MudItem xs="12" sm="6" md="4"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="140px" /></MudItem>
+        }
+    </MudGrid>
+    <span class="d-none" data-testid="loading">Carregando favoritos...</span>
+}
+else if (_favorites.Count == 0)
+{
+    <MudText data-testid="empty">Nenhum medicamento favorito.</MudText>
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var medication in _favorites)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="1" data-testid="favorite">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudIcon Icon="@Icons.Material.Filled.Star" Style="color: #f9a825" Size="Size.Large" />
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.subtitle1"><b>@medication.DisplayName</b></MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@medication.PharmaceuticalFormName · @medication.ActiveIngredient</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudTooltip Text="Remover dos favoritos">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" aria-label="Remover"
+                                               OnClick="() => RemoveAsync(medication)" data-testid="remove" />
+                            </MudTooltip>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent Class="pt-0">
+                        @if (medication.IsControlled)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Error">Controlado</MudChip>
+                        }
+                        @if (medication.IsAntimicrobial)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Warning">Antimicrobiano</MudChip>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private IReadOnlyList<Medication> _favorites = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task AddAsync(Medication medication) =>
+        ChangeAsync(() => FavoriteApi.AddAsync(medication.Id), $"{medication.DisplayName} adicionado aos favoritos.");
+
+    private async Task RemoveAsync(Medication medication)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Remover favorito", $"Remover o medicamento \"{medication.DisplayName}\" dos favoritos?",
+            yesText: "Remover", cancelText: "Cancelar");
+        if (confirmed == true)
+        {
+            await ChangeAsync(() => FavoriteApi.RemoveAsync(medication.Id), $"{medication.DisplayName} removido dos favoritos.");
+        }
+    }
+
+    private async Task ChangeAsync(Func<Task> change, string message)
+    {
+        _error = null;
+        try
+        {
+            await change();
+            Snackbar.Add(message, Severity.Success);
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _favorites = await FavoriteApi.ListAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

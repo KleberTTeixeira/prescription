@@ -18,11 +18,14 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <!-- integration/ is a separate project (Prescription.IntegrationTests). -->
+  <!-- integration/ and blazor/ are separate projects (Prescription.IntegrationTests, Prescription.Blazor.Tests). -->
   <ItemGroup>
     <Compile Remove="integration\**" />
     <EmbeddedResource Remove="integration\**" />
     <None Remove="integration\**" />
+    <Compile Remove="blazor\**" />
+    <EmbeddedResource Remove="blazor\**" />
+    <None Remove="blazor\**" />
   </ItemGroup>
 
   <ItemGroup>

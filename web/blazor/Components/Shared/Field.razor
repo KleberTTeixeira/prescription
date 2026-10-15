@@ -1,0 +1,13 @@
+@* Read-only field: small label above the value. *@
+<div>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">@Label</MudText>
+    <MudText>@Value</MudText>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = "";
+
+    [Parameter]
+    public string? Value { get; set; }
+}

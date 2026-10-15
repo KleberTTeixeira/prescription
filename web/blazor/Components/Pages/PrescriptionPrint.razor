@@ -1,0 +1,193 @@
+@page "/receitas/{Id:int}/imprimir"
+@inject PrescriptionApiClient PrescriptionApi
+@inject ILoggedProfessionalStore LoggedProfessional
+@inject IDialogService DialogService
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+@* ECF.10.04 – printed prescription. After printing the system asks "A receita foi impressa?";
+   only when confirmed the API issues the prescription (first print; it becomes locked). *@
+<PageTitle>Imprimir receita</PageTitle>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-3 no-print" data-testid="error">@_error</MudAlert>
+}
+
+@if (_data is { } d)
+{
+    <MudPaper Elevation="1" Class="mb-4 no-print">
+        <MudToolBar>
+            <MudIconButton Href="@($"receitas/{d.Id}")" Icon="@Icons.Material.Filled.ArrowBack" aria-label="Voltar" data-testid="back" />
+            <MudText Typo="Typo.h6" Class="ml-2">Imprimir receita nº @d.Id</MudText>
+            @if (d.PrintedAt is { } printedAt)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Success" Class="ml-3"
+                         Icon="@Icons.Material.Filled.CheckCircle" data-testid="issued">Emitida em @printedAt.ToString("dd/MM/yyyy HH:mm")</MudChip>
+            }
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print"
+                       OnClick="PrintAsync" data-testid="print">Imprimir</MudButton>
+        </MudToolBar>
+    </MudPaper>
+
+    <article class="sheet" data-testid="sheet">
+        @* Institution (ECF.10.04: place, CNES, address and phone) *@
+        <header class="sheet-header" data-testid="institution">
+            <div class="institution-name">@d.Institution.Name</div>
+            <div>CNES @d.Institution.Cnes</div>
+            <div>@d.Institution.Address</div>
+            <div>Telefone: @d.Institution.Phone</div>
+        </header>
+
+        <h1 class="sheet-title">@Title(d.Category)</h1>
+
+        @* Client (address only for special control; age and sex only for antimicrobial) *@
+        <section class="block" data-testid="client">
+            <div><strong>Cliente:</strong> @d.Client.FullName</div>
+            @if (d.Client.Address is { } address)
+            {
+                <div data-testid="client-address"><strong>Endereço:</strong> @address</div>
+            }
+            @if (d.Client.Age is { } age)
+            {
+                <div data-testid="client-age"><strong>Idade:</strong> @age anos</div>
+            }
+            @if (d.Client.Sex is { } sex)
+            {
+                <div data-testid="client-sex"><strong>Sexo:</strong> @sex.ToLabel()</div>
+            }
+        </section>
+
+        @* Professional: full name, council, number and state (ECF.10.04). Not under the signature line,
+           which stays free for the signature and the stamp. *@
+        <section class="block" data-testid="professional">
+            <strong>Profissional:</strong> @d.Professional.FullName – @d.Professional.CouncilRegistration
+        </section>
+
+        @if (d.Format == PrescriptionFormat.Unstructured)
+        {
+            <section class="block free-text" data-testid="free-text">@d.FreeText</section>
+        }
+        else
+        {
+            <ol class="block items" data-testid="items">
+                @foreach (var item in d.Items)
+                {
+                    <li>
+                        <div class="item-name">@item.MedicationName – @item.PharmaceuticalFormName</div>
+                        <div>
+                            @AppCulture.Number(item.Dose) @item.DoseUnitAbbreviation, @item.FrequencyName, via @item.AdministrationRouteName.
+                            Início: @item.StartDate.ToString("dd/MM/yyyy").
+                            @if (item.DurationDays is { } days)
+                            {
+                                <text> Duração: @days dias.</text>
+                            }
+                            @if (item.IsContinuousUse)
+                            {
+                                <text> Uso contínuo.</text>
+                            }
+                            @if (item.UsageDeadline is { } deadline)
+                            {
+                                <text> Usar até @deadline.ToString("dd/MM/yyyy").</text>
+                            }
+                        </div>
+                        @if (!string.IsNullOrEmpty(item.Notes))
+                        {
+                            <div class="item-notes">@item.Notes</div>
+                        }
+                    </li>
+                }
+            </ol>
+            @if (!string.IsNullOrEmpty(d.FreeText))
+            {
+                <section class="block free-text"><strong>Observação:</strong> @d.FreeText</section>
+            }
+        }
+
+        <div class="issued-at" data-testid="issued-at">@d.Institution.Address.City, @d.IssuedAt.ToString("dd/MM/yyyy HH:mm")</div>
+
+        @* Space for the signature and the stamp of the professional (ECF.10.04): left blank on purpose. *@
+        <footer class="signature" data-testid="signature">
+            <div class="stamp-space"></div>
+            <div class="signature-line"></div>
+            <div>Assinatura e carimbo do profissional</div>
+        </footer>
+    </article>
+}
+else if (_error is null)
+{
+    <MudText data-testid="loading">Carregando...</MudText>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private PrescriptionPrintData? _data;
+    private string? _error;
+
+    private int? _loadedId;
+
+    // Going from one prescription to another keeps this component: load again when Id changes.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Id)
+        {
+            return;
+        }
+        _loadedId = Id;
+        _data = null;
+        _error = null;
+        await LoadAsync();
+    }
+
+    private static string Title(PrescriptionCategory category) => category switch
+    {
+        PrescriptionCategory.SpecialControl => "Receituário de controle especial",
+        PrescriptionCategory.Antimicrobial => "Receita de antimicrobiano",
+        _ => "Receita"
+    };
+
+    private async Task PrintAsync()
+    {
+        var data = _data!;
+        await JS.InvokeVoidAsync("print");
+
+        // Already issued, or prescription of another professional (can only reprint): nothing to confirm.
+        var canIssue = data.PrintedAt is null && data.Professional.Id == LoggedProfessional.Current?.Id;
+        if (!canIssue)
+        {
+            return;
+        }
+
+        var printed = await DialogService.ShowMessageBoxAsync("Confirmar impressão", "A receita foi impressa?",
+                                                              yesText: "Sim", cancelText: "Não");
+        if (printed != true)
+        {
+            return;
+        }
+        try
+        {
+            await PrescriptionApi.ConfirmPrintAsync(data.Id);
+            Snackbar.Add("Receita emitida. A partir de agora ela não pode mais ser alterada.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _data = await PrescriptionApi.GetPrintDataAsync((uint)Id);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

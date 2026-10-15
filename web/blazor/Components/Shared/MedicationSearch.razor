@@ -1,0 +1,79 @@
+@inject MedicationApiClient MedicationApi
+
+@* ECF.10.03 b – search of a catalog medication by name or active ingredient (list opens while typing).
+   ECF.10.07 – result rows clearly distinct, highlighted on mouse over and when chosen (styles in app.css). *@
+<MudAutocomplete @ref="_autocomplete" T="Medication" Label="@Label" Value="_value" ValueChanged="ChooseAsync" SearchFunc="SearchAsync"
+                 ToStringFunc="@(m => m?.DisplayName)" DebounceInterval="300" MinCharacters="1" ResetValueOnEmptyText="true"
+                 Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" AdornmentColor="Color.Primary"
+                 Variant="Variant.Outlined" PopoverClass="medication-list" MaxItems="50" data-testid="medication-search">
+    <ItemTemplate Context="medication">
+        <div class="d-flex align-center gap-3 medication-row" style="width: 100%">
+            <div class="flex-grow-1">
+                <div><b>@medication.DisplayName</b></div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@medication.PharmaceuticalFormName · @medication.ActiveIngredient</MudText>
+            </div>
+            @if (medication.IsControlled)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Error">Controlado</MudChip>
+            }
+            @if (medication.IsAntimicrobial)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Warning">Antimicrobiano</MudChip>
+            }
+        </div>
+    </ItemTemplate>
+    <NoItemsTemplate>
+        <MudText Class="pa-3" data-testid="no-results">Nenhum medicamento encontrado.</MudText>
+    </NoItemsTemplate>
+</MudAutocomplete>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mt-2" data-testid="search-error">@_error</MudAlert>
+}
+
+@code {
+    [Parameter]
+    public string Label { get; set; } = "Medicamento (nome ou princípio ativo)";
+
+    /// <summary>Clear the field after choosing (e.g. favorites: choose = add).</summary>
+    [Parameter]
+    public bool ClearAfterChoosing { get; set; }
+
+    [Parameter]
+    public EventCallback<Medication> OnSelected { get; set; }
+
+    private MudAutocomplete<Medication> _autocomplete = null!;
+    private Medication? _value;
+    private string? _error;
+
+    private async Task<IEnumerable<Medication>> SearchAsync(string? term, CancellationToken cancellationToken)
+    {
+        _error = null;
+        try
+        {
+            return await MedicationApi.SearchAsync(term ?? "", cancellationToken);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+            await InvokeAsync(StateHasChanged);
+            return [];
+        }
+    }
+
+    private async Task ChooseAsync(Medication? medication)
+    {
+        _value = medication;
+        if (medication is null)
+        {
+            return;
+        }
+        await OnSelected.InvokeAsync(medication);
+        if (ClearAfterChoosing)
+        {
+            _value = null;
+            await _autocomplete.ClearAsync();
+        }
+    }
+}

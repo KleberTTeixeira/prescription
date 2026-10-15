@@ -1,0 +1,160 @@
+@page "/receitas"
+@inject PrescriptionApiClient PrescriptionApi
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@* Prescriptions of the logged professional (OData), most recent first. *@
+<PageTitle>Receitas</PageTitle>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-3" data-testid="error">@_error</MudAlert>
+}
+
+<MudTable @ref="_table" T="PrescriptionListItem" ServerData="LoadAsync" Hover="true" Striped="true" Elevation="1"
+          AllowUnsorted="false" LoadingProgressColor="Color.Primary" data-testid="table">
+    <ToolBarContent>
+        <MudText Typo="Typo.h5">Receitas</MudText>
+        <MudSpacer />
+        <MudTextField T="string" Value="_clientName" ValueChanged="SearchAsync" DebounceInterval="500"
+                      Placeholder="Buscar pelo nome do cliente" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Clearable="true" Style="max-width: 340px" Class="mr-4" data-testid="client-name" />
+        <MudButton Href="receitas/nova" Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" data-testid="new">Nova receita</MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        @foreach (var column in Columns)
+        {
+            <MudTh>
+                <MudTableSortLabel T="PrescriptionListItem" SortLabel="@column.Field.ToString()"
+                                   InitialDirection="@(column.Field == PrescriptionSortField.IssuedAt ? SortDirection.Descending : SortDirection.None)"
+                                   data-testid="@($"sort-{column.Field}")">
+                    @column.Title
+                </MudTableSortLabel>
+            </MudTh>
+        }
+        <MudTh Style="text-align: right">Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Nº">@context.Id</MudTd>
+        <MudTd DataLabel="Data">@context.IssuedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+        <MudTd DataLabel="Cliente">@context.ClientName</MudTd>
+        <MudTd DataLabel="Formato">@context.Format.ToLabel()</MudTd>
+        <MudTd DataLabel="Categoria"><CategoryChip Category="context.Category" /></MudTd>
+        <MudTd DataLabel="Itens">@context.ItemCount</MudTd>
+        <MudTd DataLabel="Situação"><SituationChip IsIssued="context.IsIssued" /></MudTd>
+        <MudTd Style="text-align: right; white-space: nowrap">
+            <MudTooltip Text="Visualizar">
+                <MudIconButton Href="@($"receitas/{context.Id}")" Icon="@Icons.Material.Filled.Visibility"
+                               Color="Color.Primary" Size="Size.Small" aria-label="Visualizar" data-testid="view" />
+            </MudTooltip>
+            @if (!context.IsIssued)
+            {
+                <MudTooltip Text="Editar">
+                    <MudIconButton Href="@($"receitas/{context.Id}/editar")" Icon="@Icons.Material.Filled.Edit"
+                                   Color="Color.Primary" Size="Size.Small" aria-label="Editar" data-testid="edit" />
+                </MudTooltip>
+            }
+            <MudTooltip Text="Imprimir">
+                <MudIconButton Href="@($"receitas/{context.Id}/imprimir")" Icon="@Icons.Material.Filled.Print"
+                               Size="Size.Small" aria-label="Imprimir" data-testid="print" />
+            </MudTooltip>
+            <MudTooltip Text="Excluir">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                               aria-label="Excluir" OnClick="() => DeleteAsync(context)" data-testid="delete" />
+            </MudTooltip>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText data-testid="empty">Nenhuma receita encontrada.</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText data-testid="loading">Carregando receitas...</MudText>
+    </LoadingContent>
+    <PagerContent>
+        @if (_total > PageSize)
+        {
+            <MudTablePager HideRowsPerPage="true" PageSizeOptions="@([PageSize])"
+                           InfoFormat="{first_item}–{last_item} de {all_items}" data-testid="pager" />
+        }
+    </PagerContent>
+</MudTable>
+
+@code {
+    public const int PageSize = 20;
+
+    private static readonly (PrescriptionSortField Field, string Title)[] Columns =
+    [
+        (PrescriptionSortField.Id, "Nº"),
+        (PrescriptionSortField.IssuedAt, "Data"),
+        (PrescriptionSortField.ClientName, "Cliente"),
+        (PrescriptionSortField.Format, "Formato"),
+        (PrescriptionSortField.Category, "Categoria"),
+        (PrescriptionSortField.ItemCount, "Itens"),
+        (PrescriptionSortField.IsIssued, "Situação")
+    ];
+
+    private MudTable<PrescriptionListItem> _table = null!;
+    private string? _clientName;
+    private int _total;
+    private string? _error;
+
+    /// <summary>Called by the table: page, sort (column title click; default most recent first) and filter in the API.</summary>
+    private async Task<TableData<PrescriptionListItem>> LoadAsync(TableState state, CancellationToken cancellationToken)
+    {
+        var hadError = _error is not null;
+        _error = null;
+        var field = Enum.TryParse<PrescriptionSortField>(state.SortLabel, out var parsed) ? parsed : PrescriptionSortField.IssuedAt;
+        var direction = state.SortDirection == SortDirection.Ascending ? PrescriptionSortDirection.Asc : PrescriptionSortDirection.Desc;
+        var query = new PrescriptionListQuery(_clientName ?? "", new PrescriptionSort(field, direction),
+                                              state.Page * PageSize, PageSize);
+        try
+        {
+            var page = await PrescriptionApi.ListAsync(query, cancellationToken);
+            _total = page.Total;
+            if (hadError)
+            {
+                StateHasChanged();
+            }
+            return new TableData<PrescriptionListItem> { Items = page.Rows, TotalItems = page.Total };
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+            _total = 0;
+            // The table only re-renders itself; the error alert is outside it.
+            StateHasChanged();
+            return new TableData<PrescriptionListItem> { Items = [], TotalItems = 0 };
+        }
+    }
+
+    /// <summary>Filters while typing (0.5 s after the last key), from the first page.</summary>
+    private async Task SearchAsync(string? clientName)
+    {
+        _clientName = clientName;
+        await _table.ReloadServerData();
+    }
+
+    private async Task DeleteAsync(PrescriptionListItem row)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Excluir receita", $"Excluir a receita nº {row.Id} de {row.ClientName}?",
+            yesText: "Excluir", cancelText: "Cancelar");
+        if (confirmed != true)
+        {
+            return;
+        }
+        try
+        {
+            await PrescriptionApi.DeleteAsync(row.Id);
+            _error = null;
+            Snackbar.Add($"Receita nº {row.Id} excluída.", Severity.Success);
+            await _table.ReloadServerData();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

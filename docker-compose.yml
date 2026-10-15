@@ -1,6 +1,6 @@
-# MySQL 8.0, Web API and Angular - run from the root of the solution folder:
+# MySQL 8.0, Web API, Angular and Blazor - run from the root of the solution folder:
 #   docker compose up -d --build
-# Angular: http://localhost:4200 | Web API (Swagger): http://localhost:5000/swagger | MySQL: localhost:3306
+# Angular: http://localhost:4200 | Blazor: http://localhost:5100 | Web API (Swagger): http://localhost:5000/swagger | MySQL: localhost:3306
 # Database data is kept in the "mysql-data" volume; the db scripts run only on the first start.
 # Back to the original seed: docker compose down -v
 
@@ -48,6 +48,18 @@ services:
       API_URL: http://api:5000
     ports:
       - "4200:4200"
+    depends_on:
+      - api
+
+  blazor:
+    build:
+      context: .
+      dockerfile: web/blazor/Dockerfile
+    image: prescription-blazor
+    environment:
+      ApiBaseUrl: http://api:5000
+    ports:
+      - "5100:5100"
     depends_on:
       - api
 

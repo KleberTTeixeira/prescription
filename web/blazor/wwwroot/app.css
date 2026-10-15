@@ -1,0 +1,67 @@
+h1:focus {
+    outline: none;
+}
+
+/* Error bar shown by Blazor (both layouts). */
+#blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }
+
+/* ECF.10.07 – medication list: clearly distinct rows, highlight on mouse over and on the chosen row
+   (the list opens in a popover outside the component, so the style is global). */
+.medication-list .mud-list-item {
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+    .medication-list .mud-list-item:nth-child(even) {
+        background-color: var(--mud-palette-background-gray);
+    }
+
+    .medication-list .mud-list-item:hover,
+    .medication-list .mud-list-item.mud-selected-item {
+        background-color: var(--mud-palette-primary-hover);
+        box-shadow: inset 4px 0 0 var(--mud-palette-primary);
+    }
+
+/* Printing (ECF.10.04): only the prescription; top bar, buttons and messages are hidden. */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    .mud-main-content {
+        padding-top: 0 !important;
+    }
+
+    .print-container {
+        padding: 0 !important;
+        max-width: none !important;
+    }
+}
+
+.blazor-error-boundary {
+    background: #b32121;
+    padding: 1rem;
+    color: white;
+}
+
+    .blazor-error-boundary::after {
+        content: "Ocorreu um erro inesperado.";
+    }

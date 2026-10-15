@@ -1,0 +1,18 @@
+/* Room for the footer bar fixed at the bottom of the screen. */
+.form-body {
+    padding-bottom: 72px;
+}
+
+.form-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 12px 32px;
+    background-color: var(--mud-palette-surface);
+    border-top: 1px solid var(--mud-palette-lines-default);
+}

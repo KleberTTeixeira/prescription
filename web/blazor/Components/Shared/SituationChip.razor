@@ -1,0 +1,16 @@
+@* Issued (printed for the first time) or not, as a colored tag with icon. *@
+@if (IsIssued)
+{
+    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Success"
+             Icon="@Icons.Material.Filled.CheckCircle" data-testid="situation">Emitida</MudChip>
+}
+else
+{
+    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default"
+             Icon="@Icons.Material.Filled.Schedule" data-testid="situation">Não emitida</MudChip>
+}
+
+@code {
+    [Parameter]
+    public bool IsIssued { get; set; }
+}

@@ -1,0 +1,114 @@
+@page "/textos-padrao"
+@inject TemplateApiClient TemplateApi
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@* ECF.10.02 – standard texts of the logged professional (used as a base in the prescription). *@
+<PageTitle>Textos padrão</PageTitle>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-3" data-testid="error">@_error</MudAlert>
+}
+
+<MudTable T="Template" Items="_templates" Loading="_loading" Hover="true" Striped="true" Elevation="1"
+          LoadingProgressColor="Color.Primary" data-testid="table">
+    <ToolBarContent>
+        <MudText Typo="Typo.h5">Textos padrão</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="() => OpenAsync(null)" data-testid="new">Novo texto padrão</MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Título</MudTh>
+        <MudTh>Texto</MudTh>
+        <MudTh Style="text-align: right">Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Título"><b>@context.Title</b></MudTd>
+        <MudTd DataLabel="Texto"><MudText Typo="Typo.body2" Color="Color.Secondary">@Start(context.Content)</MudText></MudTd>
+        <MudTd Style="text-align: right; white-space: nowrap">
+            <MudTooltip Text="Editar">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" aria-label="Editar"
+                               OnClick="() => OpenAsync(context)" data-testid="edit" />
+            </MudTooltip>
+            <MudTooltip Text="Excluir">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" aria-label="Excluir"
+                               OnClick="() => DeleteAsync(context)" data-testid="delete" />
+            </MudTooltip>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText data-testid="empty">Nenhum texto padrão cadastrado.</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText data-testid="loading">Carregando textos padrão...</MudText>
+    </LoadingContent>
+</MudTable>
+
+@code {
+    private IReadOnlyList<Template> _templates = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>Beginning of the text (one line in the list).</summary>
+    private static string Start(string content)
+    {
+        var line = content.ReplaceLineEndings(" ");
+        return line.Length <= 80 ? line : line[..80] + "…";
+    }
+
+    private async Task OpenAsync(Template? template)
+    {
+        var parameters = new DialogParameters<TemplateDialog> { { d => d.Template, template } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false };
+        var dialog = await DialogService.ShowAsync<TemplateDialog>(null, parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: Template saved })
+        {
+            Snackbar.Add($"Texto padrão \"{saved.Title}\" salvo.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task DeleteAsync(Template template)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Excluir texto padrão", $"Excluir o texto padrão \"{template.Title}\"?",
+            yesText: "Excluir", cancelText: "Cancelar");
+        if (confirmed != true)
+        {
+            return;
+        }
+        try
+        {
+            await TemplateApi.DeleteAsync(template.Id);
+            Snackbar.Add($"Texto padrão \"{template.Title}\" excluído.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _templates = await TemplateApi.ListAsync();
+            _error = null;
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
